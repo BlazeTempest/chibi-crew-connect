@@ -1,15 +1,51 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Mail, Star, Edit } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+
+type ProfileFormData = {
+  name: string;
+  location: string;
+  email: string;
+  bio: string;
+  status: string;
+};
 
 const Profile = () => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: "Luna Sakura",
+    location: "Tokyo, Japan",
+    email: "luna@chibicrew.com",
+    bio: "✨ Passionate developer who loves creating beautiful and functional web experiences. Always excited to collaborate on new projects!",
+    status: "available",
+    emoji: "🦊"
+  });
+
+  const { register, handleSubmit, reset } = useForm<ProfileFormData>({
+    defaultValues: profileData
+  });
+
   const skills = ["React", "TypeScript", "UI/UX Design", "Project Management", "Node.js"];
   const experiences = [
     { role: "Frontend Developer", company: "Tech Startup", period: "2022 - Present" },
     { role: "UI Designer", company: "Creative Agency", period: "2020 - 2022" },
   ];
+
+  const onSubmit = (data: ProfileFormData) => {
+    setProfileData({ ...profileData, ...data });
+    setIsDialogOpen(false);
+    toast.success("Profile updated successfully! ✨");
+  };
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
@@ -18,37 +54,111 @@ const Profile = () => {
         <Card className="p-8 mb-6 bg-gradient-to-br from-card to-muted/30 border-2 border-primary/20 shadow-card animate-fade-in">
           <div className="flex items-start gap-6">
             <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-5xl shadow-glow animate-float">
-              🦊
+              {profileData.emoji}
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
-                <h1 className="text-4xl font-bold text-foreground">Luna Sakura</h1>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="border-2 border-primary hover:bg-primary/10 rounded-full"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
+                <h1 className="text-4xl font-bold text-foreground">{profileData.name}</h1>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-2 border-primary hover:bg-primary/10 rounded-full"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px] bg-card border-2 border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold text-foreground">Edit Profile ✨</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Name</Label>
+                        <Input 
+                          id="name" 
+                          {...register("name")} 
+                          className="border-2 border-border focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Location</Label>
+                        <Input 
+                          id="location" 
+                          {...register("location")} 
+                          className="border-2 border-border focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          {...register("email")} 
+                          className="border-2 border-border focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="bio">Bio</Label>
+                        <Textarea 
+                          id="bio" 
+                          {...register("bio")} 
+                          className="border-2 border-border focus:border-primary min-h-[100px]"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select defaultValue={profileData.status} onValueChange={(value) => reset({ ...profileData, status: value })}>
+                          <SelectTrigger className="border-2 border-border">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="available">🌞 Available</SelectItem>
+                            <SelectItem value="busy">🌙 Busy</SelectItem>
+                            <SelectItem value="looking">🌸 Looking for Team</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => setIsDialogOpen(false)}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit"
+                          className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90"
+                        >
+                          Save Changes
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
               <div className="flex items-center gap-4 text-muted-foreground mb-4">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" />
-                  Tokyo, Japan
+                  {profileData.location}
                 </span>
                 <span className="flex items-center gap-1">
                   <Mail className="w-4 h-4" />
-                  luna@chibicrew.com
+                  {profileData.email}
                 </span>
               </div>
               <p className="text-foreground mb-4">
-                ✨ Passionate developer who loves creating beautiful and functional web experiences. 
-                Always excited to collaborate on new projects!
+                {profileData.bio}
               </p>
               <div className="flex items-center gap-2">
                 <Badge className="bg-gradient-to-r from-primary to-secondary text-primary-foreground border-0 px-4 py-1 rounded-full shadow-soft">
-                  🌞 Available
+                  {profileData.status === "available" && "🌞 Available"}
+                  {profileData.status === "busy" && "🌙 Busy"}
+                  {profileData.status === "looking" && "🌸 Looking for Team"}
                 </Badge>
                 <div className="flex items-center gap-1 text-foreground">
                   <Star className="w-5 h-5 fill-accent text-accent" />
