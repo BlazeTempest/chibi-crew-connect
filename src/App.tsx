@@ -12,6 +12,7 @@ import Tasks from "./pages/Tasks";
 import Chat from "./pages/Chat";
 import Ratings from "./pages/Ratings";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
       <Sonner position="top-center" />
       <BrowserRouter>
         <Routes>
+          <Route path="/auth" element={<Auth />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
