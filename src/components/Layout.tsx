@@ -1,7 +1,42 @@
-import { Home, Users, Briefcase, ListTodo, MessageCircle, Star, Search } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Home, Users, Briefcase, ListTodo, MessageCircle, Star, Search, LogOut } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const Layout = () => {
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "See you next time!",
+    });
+    navigate("/auth");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   const navItems = [
     { title: "Dashboard", url: "/", icon: Home },
     { title: "Team Finder", url: "/team-finder", icon: Search },
@@ -20,7 +55,7 @@ const Layout = () => {
           ✨
         </div>
         
-        <nav className="flex flex-col gap-4">
+        <nav className="flex flex-col gap-4 flex-1">
           {navItems.map((item) => (
             <NavLink
               key={item.url}
@@ -38,6 +73,15 @@ const Layout = () => {
             </NavLink>
           ))}
         </nav>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleSignOut}
+          className="w-12 h-12 rounded-2xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="w-5 h-5" />
+        </Button>
       </aside>
 
       {/* Main Content */}
