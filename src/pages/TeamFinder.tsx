@@ -6,54 +6,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Star, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { useProfiles } from "@/hooks/useProfiles";
+import { useRatings } from "@/hooks/useRatings";
+import { useAuth } from "@/hooks/useAuth";
 
 const TeamFinder = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { profiles, loading } = useProfiles();
+  const { ratings } = useRatings();
+  const { user } = useAuth();
 
-  const teammates = [
-    {
-      id: 1,
-      name: "Alex Chen",
-      avatar: "🐱",
-      skills: ["React", "Node.js", "MongoDB"],
-      rating: 4.9,
-      availability: "Available",
-      matchScore: 95,
-    },
-    {
-      id: 2,
-      name: "Sarah Kim",
-      avatar: "🐰",
-      skills: ["UI/UX", "Figma", "Design Systems"],
-      rating: 4.8,
-      availability: "Available",
-      matchScore: 92,
-    },
-    {
-      id: 3,
-      name: "Mike Johnson",
-      avatar: "🐼",
-      skills: ["Python", "Machine Learning", "Data Science"],
-      rating: 4.7,
-      availability: "Busy",
-      matchScore: 88,
-    },
-    {
-      id: 4,
-      name: "Emma Wilson",
-      avatar: "🦄",
-      skills: ["Vue.js", "TypeScript", "Testing"],
-      rating: 5.0,
-      availability: "Available",
-      matchScore: 90,
-    },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen p-8 flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">Loading teammates...</p>
+      </div>
+    );
+  }
 
   const handleInvite = (name: string) => {
     toast.success(`💖 Invitation sent to ${name}!`, {
       description: "They'll be notified about your project",
     });
   };
+
+  const getAverageRating = (userId: string) => {
+    const userRatings = ratings.filter((r) => r.rated_user_id === userId);
+    if (userRatings.length === 0) return 0;
+    return userRatings.reduce((acc, r) => acc + r.rating, 0) / userRatings.length;
+  };
+
+  const filteredProfiles = profiles.filter((profile) => {
+    if (profile.id === user?.id) return false; // Don't show current user
+    if (searchQuery) {
+      return (
+        profile.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.bio?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
@@ -115,80 +107,52 @@ const TeamFinder = () => {
 
         {/* Results Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {teammates.map((teammate, index) => (
+          {filteredProfiles.map((profile, index) => {
+            const rating = getAverageRating(profile.id);
+            const reviewCount = ratings.filter((r) => r.rated_user_id === profile.id).length;
+            return (
             <Card 
-              key={teammate.id}
-              className={`p-6 shadow-soft hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in border-2 ${
-                teammate.matchScore >= 90 
-                  ? 'border-primary/50 bg-gradient-to-br from-primary/5 to-card' 
-                  : 'border-border'
-              }`}
+              key={profile.id}
+              className="p-6 shadow-soft hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in border-2 border-border"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-start gap-4">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-4xl shadow-soft animate-float">
-                  {teammate.avatar}
+                  {profile.avatar_url || "👤"}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-foreground">{teammate.name}</h3>
-                    {teammate.matchScore >= 90 && (
-                      <Badge className="bg-gradient-to-r from-accent to-secondary text-accent-foreground border-0 rounded-full animate-pulse">
-                        {teammate.matchScore}% Match
-                      </Badge>
-                    )}
-                  </div>
+                  <h3 className="text-xl font-bold text-foreground mb-2">{profile.username}</h3>
                   
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star 
                           key={star} 
-                          className={`w-4 h-4 ${star <= teammate.rating ? 'fill-accent text-accent' : 'text-muted'}`}
+                          className={`w-4 h-4 ${star <= rating ? 'fill-accent text-accent' : 'text-muted'}`}
                         />
                       ))}
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{teammate.rating}</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {rating > 0 ? rating.toFixed(1) : "N/A"}
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {teammate.skills.map((skill, idx) => (
-                      <Badge 
-                        key={idx}
-                        variant="outline"
-                        className="rounded-full border-2 bg-gradient-to-r hover:scale-105 transition-transform"
-                        style={{
-                          borderColor: idx % 3 === 0 ? 'hsl(333 100% 92%)' : idx % 3 === 1 ? 'hsl(231 97% 89%)' : 'hsl(154 75% 81%)',
-                          backgroundColor: idx % 3 === 0 ? 'hsl(333 100% 97%)' : idx % 3 === 1 ? 'hsl(231 97% 97%)' : 'hsl(154 75% 95%)',
-                        }}
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
+                  {profile.bio && (
+                    <p className="text-sm text-muted-foreground mb-3">{profile.bio}</p>
+                  )}
 
-                  <div className="flex items-center justify-between">
-                    <Badge 
-                      className={`rounded-full border-0 ${
-                        teammate.availability === "Available" 
-                          ? 'bg-gradient-to-r from-accent to-accent/80 text-accent-foreground' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {teammate.availability === "Available" ? "🌞" : "🌙"} {teammate.availability}
-                    </Badge>
-                    <Button 
-                      onClick={() => handleInvite(teammate.name)}
+                  <Button 
+                    onClick={() => handleInvite(profile.username)}
                       className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground rounded-full shadow-soft hover:shadow-glow transition-all duration-300"
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
                       Invite
                     </Button>
-                  </div>
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
