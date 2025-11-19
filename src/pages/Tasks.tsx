@@ -1,33 +1,30 @@
-import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { useTasks } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/useProjects";
+import { useProfiles } from "@/hooks/useProfiles";
 
 const Tasks = () => {
-  const [tasks, setTasks] = useState([
-    { id: 1, title: "Design landing page mockups", project: "Design System Revamp", assignee: "🦊", completed: false, priority: "high" },
-    { id: 2, title: "Implement authentication flow", project: "Mobile App Launch", assignee: "🐱", completed: false, priority: "high" },
-    { id: 3, title: "Write API documentation", project: "Analytics Dashboard", assignee: "🐼", completed: true, priority: "medium" },
-    { id: 4, title: "Create user testing scenarios", project: "Design System Revamp", assignee: "🐰", completed: false, priority: "medium" },
-    { id: 5, title: "Optimize database queries", project: "Mobile App Launch", assignee: "🦄", completed: true, priority: "low" },
-  ]);
+  const { tasks, loading, toggleTask } = useTasks();
+  const { projects } = useProjects();
+  const { profiles } = useProfiles();
 
-  const completedTasks = tasks.filter(t => t.completed).length;
-  const completionPercentage = Math.round((completedTasks / tasks.length) * 100);
+  if (loading) {
+    return (
+      <div className="min-h-screen p-8 flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">Loading tasks...</p>
+      </div>
+    );
+  }
 
-  const handleTaskToggle = (taskId: number) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
-    const task = tasks.find(t => t.id === taskId);
-    if (task && !task.completed) {
-      toast.success("✨ Task completed! Great work!");
-    }
-  };
+  const completedTasks = tasks.filter((t) => t.status === "completed").length;
+  const completionPercentage = tasks.length > 0 
+    ? Math.round((completedTasks / tasks.length) * 100) 
+    : 0;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -99,19 +96,19 @@ const Tasks = () => {
             <Card 
               key={task.id}
               className={`p-6 shadow-soft hover:shadow-card transition-all duration-300 hover:scale-105 animate-fade-in bg-gradient-to-br border-2 ${
-                task.completed ? 'opacity-60' : ''
+                task.status === 'completed' ? 'opacity-60' : ''
               } ${getPriorityColor(task.priority)}`}
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-start gap-4">
                 <Checkbox 
-                  checked={task.completed}
-                  onCheckedChange={() => handleTaskToggle(task.id)}
+                  checked={task.status === 'completed'}
+                  onCheckedChange={() => toggleTask(task.id)}
                   className="mt-1 w-6 h-6 rounded-full border-2 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-primary data-[state=checked]:to-secondary"
                 />
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className={`text-lg font-semibold ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                    <h3 className={`text-lg font-semibold ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                       {task.title}
                     </h3>
                     <div className="flex items-center gap-2">
@@ -128,10 +125,9 @@ const Tasks = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <p className="text-sm text-muted-foreground">{task.project}</p>
+                    <p className="text-sm text-muted-foreground">{task.description || 'No description'}</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{task.assignee}</span>
-                      {task.completed && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                      {task.status === 'completed' && <CheckCircle2 className="w-5 h-5 text-accent" />}
                     </div>
                   </div>
                 </div>

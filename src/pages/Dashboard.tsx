@@ -3,9 +3,26 @@ import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Users, Briefcase } from "lucide-react";
 import mascotImage from "@/assets/chibi-mascot.png";
+import { useProjects } from "@/hooks/useProjects";
+import { useTasks } from "@/hooks/useTasks";
+import { useProfiles } from "@/hooks/useProfiles";
+import { useRatings } from "@/hooks/useRatings";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { projects } = useProjects();
+  const { tasks } = useTasks();
+  const { profiles } = useProfiles();
+  const { ratings } = useRatings();
+  const { user } = useAuth();
+
+  const activeProjects = projects.filter((p) => p.status === "active").length;
+  const myRatings = ratings.filter((r) => r.rated_user_id === user?.id);
+  const averageRating =
+    myRatings.length > 0
+      ? (myRatings.reduce((acc, r) => acc + r.rating, 0) / myRatings.length).toFixed(1)
+      : "N/A";
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
@@ -61,7 +78,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Active Projects</p>
-              <p className="text-3xl font-bold text-foreground">3</p>
+              <p className="text-3xl font-bold text-foreground">{activeProjects}</p>
             </div>
           </div>
         </Card>
@@ -73,7 +90,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Team Members</p>
-              <p className="text-3xl font-bold text-foreground">12</p>
+              <p className="text-3xl font-bold text-foreground">{profiles.length}</p>
             </div>
           </div>
         </Card>
@@ -85,7 +102,9 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Your Rating</p>
-              <p className="text-3xl font-bold text-foreground">4.8</p>
+              <p className="text-3xl font-bold text-foreground">
+                {typeof averageRating === "string" ? averageRating : `${averageRating} ⭐`}
+              </p>
             </div>
           </div>
         </Card>

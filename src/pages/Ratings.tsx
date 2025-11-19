@@ -5,27 +5,50 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Star } from "lucide-react";
 import { toast } from "sonner";
+import { useProfiles } from "@/hooks/useProfiles";
+import { useRatings } from "@/hooks/useRatings";
+import { useAuth } from "@/hooks/useAuth";
 
 const Ratings = () => {
   const [selectedRating, setSelectedRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  
+  const { profiles, loading } = useProfiles();
+  const { ratings, submitRating } = useRatings();
+  const { user } = useAuth();
 
-  const teammates = [
-    { id: 1, name: "Alex Chen", avatar: "🐱", rating: 4.9, reviews: 15 },
-    { id: 2, name: "Sarah Kim", avatar: "🐰", rating: 4.8, reviews: 22 },
-    { id: 3, name: "Mike Johnson", avatar: "🐼", rating: 4.7, reviews: 18 },
-    { id: 4, name: "Emma Wilson", avatar: "🦄", rating: 5.0, reviews: 12 },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen p-8 flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">Loading ratings...</p>
+      </div>
+    );
+  }
 
-  const handleSubmitRating = (name: string) => {
+  const handleSubmitRating = async (userId: string, username: string) => {
     if (selectedRating === 0) {
       toast.error("Please select a rating!");
       return;
     }
-    toast.success(`⭐ Rating submitted for ${name}!`);
+    await submitRating(userId, selectedRating, comment);
     setSelectedRating(0);
     setComment("");
+    setSelectedUserId(null);
   };
+
+  const getAverageRating = (userId: string) => {
+    const userRatings = ratings.filter((r) => r.rated_user_id === userId);
+    if (userRatings.length === 0) return 0;
+    return userRatings.reduce((acc, r) => acc + r.rating, 0) / userRatings.length;
+  };
+
+  const getReviewCount = (userId: string) => {
+    return ratings.filter((r) => r.rated_user_id === userId).length;
+  };
+
+  const myReceivedRatings = ratings.filter((r) => r.rated_user_id === user?.id);
+  const filteredProfiles = profiles.filter((p) => p.id !== user?.id);
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
