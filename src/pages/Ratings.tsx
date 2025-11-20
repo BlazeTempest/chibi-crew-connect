@@ -64,30 +64,30 @@ const Ratings = () => {
 
         {/* Rating Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {teammates.map((teammate, index) => (
+          {filteredProfiles.map((profile, index) => (
             <Card 
-              key={teammate.id}
+              key={profile.id}
               className="p-6 shadow-card hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-4xl shadow-soft animate-float">
-                  {teammate.avatar}
+                  {profile.avatar_url || "👤"}
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-foreground mb-2">{teammate.name}</h3>
+                  <h3 className="text-2xl font-bold text-foreground mb-2">{profile.username}</h3>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star 
                           key={star} 
-                          className={`w-5 h-5 ${star <= teammate.rating ? 'fill-accent text-accent' : 'text-muted'}`}
+                          className={`w-5 h-5 ${star <= getAverageRating(profile.id) ? 'fill-accent text-accent' : 'text-muted'}`}
                         />
                       ))}
                     </div>
-                    <span className="text-lg font-bold text-foreground">{teammate.rating}</span>
+                    <span className="text-lg font-bold text-foreground">{getAverageRating(profile.id).toFixed(1)}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{teammate.reviews} reviews</p>
+                  <p className="text-sm text-muted-foreground">{getReviewCount(profile.id)} reviews</p>
                 </div>
               </div>
 
@@ -95,6 +95,7 @@ const Ratings = () => {
                 <DialogTrigger asChild>
                   <Button 
                     className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground rounded-full shadow-soft hover:shadow-glow transition-all duration-300"
+                    onClick={() => setSelectedUserId(profile.id)}
                   >
                     Rate Teammate
                   </Button>
@@ -102,8 +103,8 @@ const Ratings = () => {
                 <DialogContent className="bg-card border-2 border-primary/20 shadow-glow rounded-3xl">
                   <DialogHeader>
                     <DialogTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                      <span className="text-3xl">{teammate.avatar}</span>
-                      Rate {teammate.name}
+                      <span className="text-3xl">{profile.avatar_url || "👤"}</span>
+                      Rate {profile.username}
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-6 py-4">
@@ -135,8 +136,8 @@ const Ratings = () => {
                       />
                     </div>
 
-                    <Button 
-                      onClick={() => handleSubmitRating(teammate.name)}
+                    <Button
+                      onClick={() => handleSubmitRating(profile.id, profile.username)}
                       className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground rounded-full shadow-soft hover:shadow-glow transition-all duration-300"
                     >
                       Submit Rating
@@ -155,37 +156,46 @@ const Ratings = () => {
             Reviews I've Received
           </h2>
           <div className="space-y-4">
-            {[
-              { name: "Emma Wilson", avatar: "🦄", rating: 5, comment: "Absolutely amazing to work with! Very creative and responsive 💖", time: "2 days ago" },
-              { name: "Mike Johnson", avatar: "🐼", rating: 5, comment: "Great communication and delivered high quality work! ✨", time: "1 week ago" },
-              { name: "Sarah Kim", avatar: "🐰", rating: 4, comment: "Professional and reliable teammate!", time: "2 weeks ago" },
-            ].map((review, index) => (
-              <div 
-                key={index}
-                className="p-4 rounded-2xl bg-gradient-to-br from-muted/50 to-background border-2 border-border hover:border-primary/30 transition-all duration-300"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl">
-                    {review.avatar}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">{review.name}</h4>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star 
-                            key={star} 
-                            className={`w-4 h-4 ${star <= review.rating ? 'fill-accent text-accent' : 'text-muted'}`}
-                          />
-                        ))}
-                      </div>
+            {myReceivedRatings.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No reviews yet. Keep collaborating to receive feedback!
+              </p>
+            ) : (
+              myReceivedRatings.map((rating, index) => {
+                const rater = profiles.find((p) => p.id === rating.rater_id);
+                return (
+                <div 
+                  key={rating.id}
+                  className="p-4 rounded-2xl bg-gradient-to-br from-muted/50 to-background border-2 border-border hover:border-primary/30 transition-all duration-300"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl">
+                      {rater?.avatar_url || "👤"}
                     </div>
-                    <p className="text-muted-foreground mb-1">{review.comment}</p>
-                    <p className="text-xs text-muted-foreground">{review.time}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-foreground">{rater?.username || "Unknown"}</h4>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star 
+                              key={star} 
+                              className={`w-4 h-4 ${star <= rating.rating ? 'fill-accent text-accent' : 'text-muted'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {rating.comment && (
+                        <p className="text-muted-foreground mb-1">{rating.comment}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(rating.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })
+            )}
           </div>
         </Card>
       </div>
