@@ -7,45 +7,74 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Mail, Star, Edit } from "lucide-react";
+import { MapPin, Mail, Star, Edit, X, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
+import { useRatings } from "@/hooks/useRatings";
 
 type ProfileFormData = {
-  name: string;
-  location: string;
-  email: string;
+  username: string;
   bio: string;
-  status: string;
 };
 
 const Profile = () => {
+  const { user } = useAuth();
+  const { profile, loading, updateProfile } = useProfile();
+  const { ratings } = useRatings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "Luna Sakura",
-    location: "Tokyo, Japan",
-    email: "luna@chibicrew.com",
-    bio: "✨ Passionate developer who loves creating beautiful and functional web experiences. Always excited to collaborate on new projects!",
-    status: "available",
-    emoji: "🦊"
-  });
+  const [isSkillsDialogOpen, setIsSkillsDialogOpen] = useState(false);
+  const [skills, setSkills] = useState<string[]>([]);
+  const [newSkill, setNewSkill] = useState("");
 
   const { register, handleSubmit, reset } = useForm<ProfileFormData>({
-    defaultValues: profileData
+    defaultValues: {
+      username: profile?.username || "",
+      bio: profile?.bio || ""
+    }
   });
 
-  const skills = ["React", "TypeScript", "UI/UX Design", "Project Management", "Node.js"];
-  const experiences = [
-    { role: "Frontend Developer", company: "Tech Startup", period: "2022 - Present" },
-    { role: "UI Designer", company: "Creative Agency", period: "2020 - 2022" },
-  ];
+  // Calculate average rating for the user
+  const userRatings = ratings.filter(r => r.rated_user_id === user?.id);
+  const avgRating = userRatings.length > 0
+    ? userRatings.reduce((sum, r) => sum + r.rating, 0) / userRatings.length
+    : 0;
 
-  const onSubmit = (data: ProfileFormData) => {
-    setProfileData({ ...profileData, ...data });
+  const onSubmit = async (data: ProfileFormData) => {
+    await updateProfile(data);
     setIsDialogOpen(false);
-    toast.success("Profile updated successfully! ✨");
+    reset(data);
   };
+
+  const handleAddSkill = () => {
+    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
+      setSkills([...skills, newSkill.trim()]);
+      setNewSkill("");
+      toast.success("Skill added!");
+    }
+  };
+
+  const handleRemoveSkill = (skillToRemove: string) => {
+    setSkills(skills.filter(s => s !== skillToRemove));
+    toast.success("Skill removed!");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-2xl text-muted-foreground">Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (!profile || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-2xl text-muted-foreground">Please log in to view your profile</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
@@ -54,11 +83,11 @@ const Profile = () => {
         <Card className="p-8 mb-6 bg-gradient-to-br from-card to-muted/30 border-2 border-primary/20 shadow-card animate-fade-in">
           <div className="flex items-start gap-6">
             <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-5xl shadow-glow animate-float">
-              {profileData.emoji}
+              {profile.avatar_url || "👤"}
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
-                <h1 className="text-4xl font-bold text-foreground">{profileData.name}</h1>
+                <h1 className="text-4xl font-bold text-foreground">{profile.username}</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
@@ -76,27 +105,10 @@ const Profile = () => {
                     </DialogHeader>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="username">Username</Label>
                         <Input 
-                          id="name" 
-                          {...register("name")} 
-                          className="border-2 border-border focus:border-primary"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="location">Location</Label>
-                        <Input 
-                          id="location" 
-                          {...register("location")} 
-                          className="border-2 border-border focus:border-primary"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input 
-                          id="email" 
-                          type="email" 
-                          {...register("email")} 
+                          id="username" 
+                          {...register("username")} 
                           className="border-2 border-border focus:border-primary"
                         />
                       </div>
@@ -105,21 +117,9 @@ const Profile = () => {
                         <Textarea 
                           id="bio" 
                           {...register("bio")} 
+                          placeholder="Tell us about yourself..."
                           className="border-2 border-border focus:border-primary min-h-[100px]"
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Select defaultValue={profileData.status} onValueChange={(value) => reset({ ...profileData, status: value })}>
-                          <SelectTrigger className="border-2 border-border">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="available">🌞 Available</SelectItem>
-                            <SelectItem value="busy">🌙 Busy</SelectItem>
-                            <SelectItem value="looking">🌸 Looking for Team</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
                       <div className="flex gap-3 pt-4">
                         <Button 
@@ -143,27 +143,18 @@ const Profile = () => {
               </div>
               <div className="flex items-center gap-4 text-muted-foreground mb-4">
                 <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {profileData.location}
-                </span>
-                <span className="flex items-center gap-1">
                   <Mail className="w-4 h-4" />
-                  {profileData.email}
+                  {user.email}
                 </span>
               </div>
               <p className="text-foreground mb-4">
-                {profileData.bio}
+                {profile.bio || "No bio yet. Click Edit Profile to add one!"}
               </p>
               <div className="flex items-center gap-2">
-                <Badge className="bg-gradient-to-r from-primary to-secondary text-primary-foreground border-0 px-4 py-1 rounded-full shadow-soft">
-                  {profileData.status === "available" && "🌞 Available"}
-                  {profileData.status === "busy" && "🌙 Busy"}
-                  {profileData.status === "looking" && "🌸 Looking for Team"}
-                </Badge>
                 <div className="flex items-center gap-1 text-foreground">
                   <Star className="w-5 h-5 fill-accent text-accent" />
-                  <span className="font-bold">4.8</span>
-                  <span className="text-muted-foreground">(24 reviews)</span>
+                  <span className="font-bold">{avgRating.toFixed(1)}</span>
+                  <span className="text-muted-foreground">({userRatings.length} reviews)</span>
                 </div>
               </div>
             </div>
@@ -186,35 +177,86 @@ const Profile = () => {
 
           <TabsContent value="skills" className="mt-6">
             <Card className="p-6 shadow-card">
-              <h3 className="text-2xl font-bold text-foreground mb-4">My Skills</h3>
-              <div className="flex flex-wrap gap-3">
-                {skills.map((skill, index) => (
-                  <Badge 
-                    key={index}
-                    className="px-4 py-2 text-base rounded-full border-2 bg-gradient-to-r hover:scale-105 transition-transform"
-                    style={{
-                      borderColor: index % 3 === 0 ? 'hsl(333 100% 92%)' : index % 3 === 1 ? 'hsl(231 97% 89%)' : 'hsl(154 75% 81%)',
-                      backgroundColor: index % 3 === 0 ? 'hsl(333 100% 97%)' : index % 3 === 1 ? 'hsl(231 97% 97%)' : 'hsl(154 75% 95%)',
-                      color: 'hsl(0 0% 23%)'
-                    }}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold text-foreground">My Skills</h3>
+                <Dialog open={isSkillsDialogOpen} onOpenChange={setIsSkillsDialogOpen}>
+                  <Button
+                    onClick={() => setIsSkillsDialogOpen(true)}
+                    variant="outline"
+                    size="sm"
+                    className="border-2 border-primary hover:bg-primary/10 rounded-full"
                   >
-                    {skill}
-                  </Badge>
-                ))}
+                    <Plus className="w-4 h-4 mr-2" />
+                    Manage Skills
+                  </Button>
+                  <DialogContent className="sm:max-w-[500px] bg-card border-2 border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold text-foreground">Manage Skills ✨</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newSkill}
+                          onChange={(e) => setNewSkill(e.target.value)}
+                          onKeyPress={(e) => e.key === "Enter" && handleAddSkill()}
+                          placeholder="Add a skill..."
+                          className="border-2 border-border focus:border-primary"
+                        />
+                        <Button onClick={handleAddSkill} className="bg-gradient-to-r from-primary to-secondary">
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {skills.map((skill, index) => (
+                          <Badge
+                            key={index}
+                            className="px-3 py-2 text-sm rounded-full border-2 flex items-center gap-2"
+                            style={{
+                              borderColor: index % 3 === 0 ? 'hsl(333 100% 92%)' : index % 3 === 1 ? 'hsl(231 97% 89%)' : 'hsl(154 75% 81%)',
+                              backgroundColor: index % 3 === 0 ? 'hsl(333 100% 97%)' : index % 3 === 1 ? 'hsl(231 97% 97%)' : 'hsl(154 75% 95%)',
+                              color: 'hsl(0 0% 23%)'
+                            }}
+                          >
+                            {skill}
+                            <button
+                              onClick={() => handleRemoveSkill(skill)}
+                              className="hover:opacity-70"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {skills.length === 0 ? (
+                  <p className="text-muted-foreground">No skills added yet. Click "Manage Skills" to add some!</p>
+                ) : (
+                  skills.map((skill, index) => (
+                    <Badge 
+                      key={index}
+                      className="px-4 py-2 text-base rounded-full border-2 bg-gradient-to-r hover:scale-105 transition-transform"
+                      style={{
+                        borderColor: index % 3 === 0 ? 'hsl(333 100% 92%)' : index % 3 === 1 ? 'hsl(231 97% 89%)' : 'hsl(154 75% 81%)',
+                        backgroundColor: index % 3 === 0 ? 'hsl(333 100% 97%)' : index % 3 === 1 ? 'hsl(231 97% 97%)' : 'hsl(154 75% 95%)',
+                        color: 'hsl(0 0% 23%)'
+                      }}
+                    >
+                      {skill}
+                    </Badge>
+                  ))
+                )}
               </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="experience" className="mt-6">
-            <div className="space-y-4">
-              {experiences.map((exp, index) => (
-                <Card key={index} className="p-6 shadow-soft hover:shadow-card transition-all duration-300 hover:scale-105">
-                  <h4 className="text-xl font-bold text-foreground mb-1">{exp.role}</h4>
-                  <p className="text-muted-foreground mb-2">{exp.company}</p>
-                  <p className="text-sm text-muted-foreground">{exp.period}</p>
-                </Card>
-              ))}
-            </div>
+            <Card className="p-6 shadow-card">
+              <p className="text-muted-foreground text-center">Experience section coming soon!</p>
+            </Card>
           </TabsContent>
 
           <TabsContent value="ratings" className="mt-6">
@@ -226,34 +268,34 @@ const Profile = () => {
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star 
                         key={star} 
-                        className={`w-8 h-8 ${star <= 4 ? 'fill-accent text-accent' : 'text-muted'}`}
+                        className={`w-8 h-8 ${star <= Math.round(avgRating) ? 'fill-accent text-accent' : 'text-muted'}`}
                       />
                     ))}
-                    <span className="text-3xl font-bold text-foreground ml-2">4.8</span>
+                    <span className="text-3xl font-bold text-foreground ml-2">{avgRating.toFixed(1)}</span>
                   </div>
                 </div>
               </div>
               <div className="space-y-4">
-                {[
-                  { name: "Alex Chen", rating: 5, comment: "Amazing teammate! Very responsive and creative 💖" },
-                  { name: "Sarah Kim", rating: 5, comment: "Great communication and delivered high quality work ✨" },
-                  { name: "Mike Johnson", rating: 4, comment: "Reliable and professional. Would work with again!" },
-                ].map((review, index) => (
-                  <div key={index} className="border-b border-border pb-4 last:border-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-semibold text-foreground">{review.name}</p>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star 
-                            key={star} 
-                            className={`w-4 h-4 ${star <= review.rating ? 'fill-accent text-accent' : 'text-muted'}`}
-                          />
-                        ))}
+                {userRatings.length === 0 ? (
+                  <p className="text-muted-foreground text-center">No ratings yet</p>
+                ) : (
+                  userRatings.map((rating) => (
+                    <div key={rating.id} className="border-b border-border pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-semibold text-foreground">Rating</p>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star 
+                              key={star} 
+                              className={`w-4 h-4 ${star <= rating.rating ? 'fill-accent text-accent' : 'text-muted'}`}
+                            />
+                          ))}
+                        </div>
                       </div>
+                      <p className="text-muted-foreground">{rating.comment || "No comment provided"}</p>
                     </div>
-                    <p className="text-muted-foreground">{review.comment}</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </Card>
           </TabsContent>
