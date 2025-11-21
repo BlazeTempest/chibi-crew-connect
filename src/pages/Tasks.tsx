@@ -1,17 +1,72 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CheckCircle2, Plus, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useProfiles } from "@/hooks/useProfiles";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Tasks = () => {
   const { tasks, loading, toggleTask } = useTasks();
   const { projects } = useProjects();
   const { profiles } = useProfiles();
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedAssignee, setSelectedAssignee] = useState("");
+  const [priority, setPriority] = useState("medium");
+  const [dueDate, setDueDate] = useState<Date>();
+
+  const handleCreateTask = async () => {
+    if (!user || !title.trim()) {
+      toast.error("Please fill in required fields");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("tasks").insert({
+        title: title.trim(),
+        description: description.trim() || null,
+        project_id: selectedProject || null,
+        assigned_to: selectedAssignee || null,
+        priority,
+        due_date: dueDate?.toISOString() || null,
+        created_by: user.id,
+        status: "todo",
+      });
+
+      if (error) throw error;
+
+      toast.success("Task created successfully!");
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+      setSelectedProject("");
+      setSelectedAssignee("");
+      setPriority("medium");
+      setDueDate(undefined);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      toast.error("Failed to create task");
+    }
+  };
 
   if (loading) {
     return (
@@ -39,12 +94,121 @@ const Tasks = () => {
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-5xl font-bold text-foreground mb-2 flex items-center gap-3">
-            <span className="text-5xl">✅</span>
-            My Tasks
-          </h1>
-          <p className="text-xl text-muted-foreground">Stay organized and productive!</p>
+        <div className="mb-8 animate-fade-in flex items-center justify-between">
+          <div>
+            <h1 className="text-5xl font-bold text-foreground mb-2 flex items-center gap-3">
+              <span className="text-5xl">✅</span>
+              My Tasks
+            </h1>
+            <p className="text-xl text-muted-foreground">Stay organized and productive!</p>
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="rounded-full shadow-lg">
+                <Plus className="w-5 h-5 mr-2" />
+                New Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Create New Task</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    placeholder="Enter task title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Enter task description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Project</Label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a project (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Project</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Assign To</Label>
+                  <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select team member (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Unassigned</SelectItem>
+                      {profiles.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">🌟 Low</SelectItem>
+                      <SelectItem value="medium">⚡ Medium</SelectItem>
+                      <SelectItem value="high">🔥 High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "PPP") : "Pick a date (optional)"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <Button onClick={handleCreateTask} className="w-full" size="lg">
+                  Create Task
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Progress Card */}
