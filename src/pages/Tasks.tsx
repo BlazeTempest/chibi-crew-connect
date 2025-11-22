@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useProfiles } from "@/hooks/useProfiles";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,6 +34,12 @@ const Tasks = () => {
   const [selectedAssignee, setSelectedAssignee] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState<Date>();
+  const { members } = useProjectMembers(selectedProject || null);
+
+  // Filter assignees: if project selected, show only project members; otherwise show all profiles
+  const availableAssignees = selectedProject && selectedProject !== "none" 
+    ? members.map(m => ({ id: m.user_id, username: m.profiles.username }))
+    : profiles;
 
   const handleCreateTask = async () => {
     if (!user || !title.trim()) {
@@ -153,15 +160,25 @@ const Tasks = () => {
                   <Label>Assign To</Label>
                   <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select team member (optional)" />
+                      <SelectValue placeholder={
+                        selectedProject && selectedProject !== "none"
+                          ? "Select project member (optional)"
+                          : "Select team member (optional)"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Unassigned</SelectItem>
-                      {profiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.username}
+                      {availableAssignees.length === 0 && selectedProject && selectedProject !== "none" ? (
+                        <SelectItem value="no-members" disabled>
+                          No members in this project yet
                         </SelectItem>
-                      ))}
+                      ) : (
+                        availableAssignees.map((assignee) => (
+                          <SelectItem key={assignee.id} value={assignee.id}>
+                            {assignee.username}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

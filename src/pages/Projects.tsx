@@ -7,10 +7,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Users, Calendar } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Plus, Users, Calendar, CheckCircle2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { useJoinRequests } from "@/hooks/useJoinRequests";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -19,11 +22,57 @@ const Projects = () => {
   const { projects, loading } = useProjects();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [joinMessage, setJoinMessage] = useState("");
+  const { members } = useProjectMembers(selectedProject);
+  const { requests, approveRequest, rejectRequest } = useJoinRequests(selectedProject);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+
+  const selectedProjectData = projects.find(p => p.id === selectedProject);
+  const isProjectOwner = selectedProjectData?.owner_id === user?.id;
+  const hasRequestedToJoin = requests.some(r => r.user_id === user?.id);
+
+  const handleMarkAsFinished = async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({ status: "completed" })
+        .eq("id", projectId);
+
+      if (error) throw error;
+      toast.success("Project marked as finished! 🎉");
+    } catch (error) {
+      console.error("Error updating project:", error);
+      toast.error("Failed to update project");
+    }
+  };
+
+  const handleJoinRequest = async () => {
+    if (!selectedProject || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from("project_join_requests")
+        .insert({
+          project_id: selectedProject,
+          user_id: user.id,
+          message: joinMessage || null,
+          status: "pending",
+        });
+
+      if (error) throw error;
+      toast.success("Join request sent!");
+      setJoinMessage("");
+    } catch (error) {
+      console.error("Error sending join request:", error);
+      toast.error("Failed to send join request");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,10 +234,24 @@ const Projects = () => {
                     </Badge>
                   </div>
 
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end gap-2">
+                    {project.owner_id === user?.id && (
+                      <Button
+                        variant="outline"
+                        className="border-2 border-accent hover:bg-accent/10 rounded-full"
+                        onClick={() => handleMarkAsFinished(project.id)}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Mark as Finished
+                      </Button>
+                    )}
                     <Button 
                       variant="outline"
                       className="border-2 border-primary hover:bg-primary/10 rounded-full"
+                      onClick={() => {
+                        setSelectedProject(project.id);
+                        setDetailsOpen(true);
+                      }}
                     >
                       View Details
                     </Button>
@@ -240,6 +303,138 @@ const Projects = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Project Details Dialog */}
+        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">{selectedProjectData?.name}</DialogTitle>
+              <DialogDescription>
+                {selectedProjectData?.description || "No description provided"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Project Info */}
+              <div>
+                <h3 className="font-semibold mb-2">Project Information</h3>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>Created: {selectedProjectData && format(new Date(selectedProjectData.created_at), "MMMM d, yyyy")}</p>
+                  <p>Status: <Badge>{selectedProjectData?.status}</Badge></p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Team Members */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Team Members ({members.length})
+                </h3>
+                {members.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No team members yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {members.map((member) => (
+                      <Card key={member.id} className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                              {member.profiles.username[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium">{member.profiles.username}</p>
+                              <p className="text-xs text-muted-foreground">{member.role}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline">{member.role}</Badge>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Join Requests (only for project owner) */}
+              {isProjectOwner && requests.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      Pending Join Requests ({requests.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {requests.map((request) => (
+                        <Card key={request.id} className="p-3">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
+                                {request.profiles.username[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">{request.profiles.username}</p>
+                                {request.message && (
+                                  <p className="text-xs text-muted-foreground mt-1">{request.message}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => approveRequest(request.id, request.user_id, request.project_id)}
+                                className="flex-1"
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => rejectRequest(request.id)}
+                                className="flex-1"
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Join Request (for non-owners) */}
+              {!isProjectOwner && selectedProjectData?.status === "active" && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="font-semibold mb-3">Request to Join</h3>
+                    {hasRequestedToJoin ? (
+                      <p className="text-sm text-muted-foreground">
+                        You have already requested to join this project. Please wait for the project owner to respond.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        <Textarea
+                          placeholder="Add a message (optional)"
+                          value={joinMessage}
+                          onChange={(e) => setJoinMessage(e.target.value)}
+                          rows={3}
+                        />
+                        <Button onClick={handleJoinRequest} className="w-full">
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Send Join Request
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
