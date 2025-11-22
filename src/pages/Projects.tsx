@@ -8,15 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Users, Calendar, CheckCircle2, UserPlus } from "lucide-react";
+import { Plus, Users, Calendar, CheckCircle2, UserPlus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useJoinRequests } from "@/hooks/useJoinRequests";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import type { Project } from "@/hooks/useProjects";
 
 const Projects = () => {
   const { projects, loading } = useProjects();
@@ -25,6 +26,9 @@ const Projects = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [joinMessage, setJoinMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
   const { members } = useProjectMembers(selectedProject);
   const { requests, approveRequest, rejectRequest } = useJoinRequests(selectedProject);
   const [formData, setFormData] = useState({
@@ -32,6 +36,50 @@ const Projects = () => {
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  
+  // Fetch all active projects for browsing
+  useEffect(() => {
+    const fetchAllProjects = async () => {
+      setLoadingAll(true);
+      try {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("status", "active")
+          .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        setAllProjects(data || []);
+      } catch (error) {
+        console.error("Error fetching all projects:", error);
+      } finally {
+        setLoadingAll(false);
+      }
+    };
+    
+    fetchAllProjects();
+  }, []);
+  
+  // Filter browsable projects (exclude user's own projects and projects user is already member of)
+  const browsableProjects = allProjects.filter(p => {
+    // Exclude user's own projects
+    if (p.owner_id === user?.id) return false;
+    
+    // Exclude projects user is already a member of
+    const isMember = projects.some(up => up.id === p.id);
+    if (isMember) return false;
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(query) ||
+        (p.description && p.description.toLowerCase().includes(query))
+      );
+    }
+    
+    return true;
+  });
 
   const selectedProjectData = projects.find(p => p.id === selectedProject);
   const isProjectOwner = selectedProjectData?.owner_id === user?.id;
@@ -188,12 +236,15 @@ const Projects = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="active" className="animate-fade-in">
-          <TabsList className="grid w-full grid-cols-2 bg-card border border-border rounded-2xl p-1 shadow-soft mb-8">
+          <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-2xl p-1 shadow-soft mb-8">
             <TabsTrigger value="active" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-primary-foreground">
-              Active Projects ✨
+              My Projects ✨
+            </TabsTrigger>
+            <TabsTrigger value="browse" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-primary-foreground">
+              Browse Projects 🔍
             </TabsTrigger>
             <TabsTrigger value="completed" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-primary-foreground">
-              Completed Projects 🎉
+              Completed 🎉
             </TabsTrigger>
           </TabsList>
 
@@ -254,6 +305,82 @@ const Projects = () => {
                       }}
                     >
                       View Details
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="browse" className="space-y-6">
+            {/* Search Bar */}
+            <Card className="p-4 shadow-card">
+              <div className="flex items-center gap-2">
+                <Search className="w-5 h-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects by name or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border-0 focus-visible:ring-0"
+                />
+              </div>
+            </Card>
+
+            {loadingAll ? (
+              <Card className="p-12 text-center">
+                <p className="text-xl text-muted-foreground">Loading projects...</p>
+              </Card>
+            ) : browsableProjects.length === 0 ? (
+              <Card className="p-12 text-center">
+                <p className="text-2xl text-muted-foreground mb-4">
+                  {searchQuery ? "No projects found" : "No projects available"}
+                </p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Try a different search term" : "Check back later for new projects!"}
+                </p>
+              </Card>
+            ) : (
+              browsableProjects.map((project, index) => (
+                <Card 
+                  key={project.id} 
+                  className="p-6 shadow-card hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-foreground mb-2">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-muted-foreground mb-4">{project.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          <span>{format(new Date(project.created_at), "MMM d, yyyy")}</span>
+                        </div>
+                        {project.team_id && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Users className="w-4 h-4" />
+                            <span>Team Project</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-accent to-secondary text-accent-foreground border-0 rounded-full">
+                      Open to Join
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button 
+                      variant="outline"
+                      className="border-2 border-primary hover:bg-primary/10 rounded-full"
+                      onClick={() => {
+                        setSelectedProject(project.id);
+                        setDetailsOpen(true);
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Request to Join
                     </Button>
                   </div>
                 </Card>
