@@ -81,7 +81,9 @@ const Projects = () => {
     return true;
   });
 
-  const selectedProjectData = projects.find(p => p.id === selectedProject);
+  // Check both user's projects and all browsable projects
+  const selectedProjectData = projects.find(p => p.id === selectedProject) || 
+                               allProjects.find(p => p.id === selectedProject);
   const isProjectOwner = selectedProjectData?.owner_id === user?.id;
   const hasRequestedToJoin = requests.some(r => r.user_id === user?.id);
 
