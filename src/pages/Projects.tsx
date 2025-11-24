@@ -37,7 +37,7 @@ const Projects = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   
-  // Fetch all active projects for browsing
+  // Fetch all active projects for browsing with realtime updates
   useEffect(() => {
     const fetchAllProjects = async () => {
       setLoadingAll(true);
@@ -58,6 +58,26 @@ const Projects = () => {
     };
     
     fetchAllProjects();
+
+    // Subscribe to realtime changes for all projects
+    const channel = supabase
+      .channel("all-projects-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "projects",
+        },
+        () => {
+          fetchAllProjects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
   
   // Filter browsable projects (exclude user's own projects and projects user is already member of)
