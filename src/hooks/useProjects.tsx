@@ -27,13 +27,41 @@ export const useProjects = () => {
 
     const fetchProjects = async () => {
       try {
-        const { data, error } = await supabase
+        // Fetch projects where user is owner or team member
+        const { data: ownedProjects, error: ownedError } = await supabase
           .from("projects")
           .select("*")
-          .order("created_at", { ascending: false });
+          .eq("owner_id", user.id);
 
-        if (error) throw error;
-        setProjects(data || []);
+        if (ownedError) throw ownedError;
+
+        // Fetch projects where user is a team member
+        const { data: teamMemberships, error: teamError } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", user.id);
+
+        if (teamError) throw teamError;
+
+        const teamIds = teamMemberships?.map(tm => tm.team_id) || [];
+        
+        let memberProjects: Project[] = [];
+        if (teamIds.length > 0) {
+          const { data, error } = await supabase
+            .from("projects")
+            .select("*")
+            .in("team_id", teamIds)
+            .neq("owner_id", user.id);
+
+          if (error) throw error;
+          memberProjects = data || [];
+        }
+
+        // Combine and sort by creation date
+        const allUserProjects = [...(ownedProjects || []), ...memberProjects]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        setProjects(allUserProjects);
       } catch (error) {
         console.error("Error fetching projects:", error);
         toast.error("Failed to load projects");
