@@ -82,12 +82,9 @@ const Projects = () => {
   
   // Filter browsable projects (exclude user's own projects and projects user is already member of)
   const browsableProjects = allProjects.filter(p => {
-    // Exclude user's own projects
-    if (p.owner_id === user?.id) return false;
-    
-    // Exclude projects user is already a member of
-    const isMember = projects.some(up => up.id === p.id);
-    if (isMember) return false;
+    // Exclude projects user is already part of (either as owner or member)
+    const isPartOfProject = projects.some(up => up.id === p.id);
+    if (isPartOfProject) return false;
     
     // Apply search filter
     if (searchQuery) {
