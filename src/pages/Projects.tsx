@@ -37,7 +37,7 @@ const Projects = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   
-  // Fetch all active projects for browsing with realtime updates
+  // Fetch all projects for browsing with realtime updates (exclude completed)
   useEffect(() => {
     const fetchAllProjects = async () => {
       setLoadingAll(true);
@@ -45,7 +45,7 @@ const Projects = () => {
         const { data, error } = await supabase
           .from("projects")
           .select("*")
-          .eq("status", "active")
+          .neq("status", "completed")
           .order("created_at", { ascending: false });
         
         if (error) throw error;
