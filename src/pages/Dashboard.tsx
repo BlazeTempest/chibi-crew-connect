@@ -8,6 +8,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useRatings } from "@/hooks/useRatings";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDistanceToNow } from "date-fns";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,6 +24,30 @@ const Dashboard = () => {
     myRatings.length > 0
       ? (myRatings.reduce((acc, r) => acc + r.rating, 0) / myRatings.length).toFixed(1)
       : "N/A";
+
+  // Generate recent activity from real data
+  const recentActivity = [
+    ...projects.slice(0, 3).map(p => ({
+      text: `💼 Project "${p.name}" was created`,
+      time: formatDistanceToNow(new Date(p.created_at), { addSuffix: true }),
+      timestamp: new Date(p.created_at).getTime(),
+    })),
+    ...tasks.slice(0, 3).map(t => ({
+      text: `✅ Task "${t.title}" - ${t.status}`,
+      time: formatDistanceToNow(new Date(t.created_at), { addSuffix: true }),
+      timestamp: new Date(t.created_at).getTime(),
+    })),
+    ...myRatings.slice(0, 3).map(r => {
+      const rater = profiles.find(p => p.id === r.rater_id);
+      return {
+        text: `⭐ ${rater?.username || 'Someone'} rated you ${r.rating} stars`,
+        time: formatDistanceToNow(new Date(r.created_at), { addSuffix: true }),
+        timestamp: new Date(r.created_at).getTime(),
+      };
+    }),
+  ]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 5);
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-background via-muted/20 to-background">
@@ -117,16 +142,18 @@ const Dashboard = () => {
           Recent Activity
         </h3>
         <div className="space-y-4">
-          {[
-            { text: "🎨 Sarah joined your Design Team project", time: "2 hours ago" },
-            { text: "✅ Completed 5 tasks in Web Development", time: "5 hours ago" },
-            { text: "💬 New message from Alex in Chat", time: "1 day ago" },
-          ].map((activity, index) => (
-            <div key={index} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-              <p className="text-foreground">{activity.text}</p>
-              <p className="text-sm text-muted-foreground">{activity.time}</p>
-            </div>
-          ))}
+          {recentActivity.length > 0 ? (
+            recentActivity.map((activity, index) => (
+              <div key={index} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                <p className="text-foreground">{activity.text}</p>
+                <p className="text-sm text-muted-foreground">{activity.time}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              No recent activity yet. Start by creating a project or completing tasks! 🚀
+            </p>
+          )}
         </div>
       </Card>
     </div>
