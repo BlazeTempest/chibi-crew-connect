@@ -441,6 +441,10 @@ const Projects = () => {
                   <Button 
                     variant="outline"
                     className="border-2 border-primary hover:bg-primary/10 rounded-full w-full"
+                    onClick={() => {
+                      setSelectedProject(project.id);
+                      setDetailsOpen(true);
+                    }}
                   >
                     View Archive
                   </Button>
